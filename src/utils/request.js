@@ -14,7 +14,8 @@ const service = axios.create({
 service.interceptors.request.use(
   config => {
     // do something before request is sent
-
+    console.log('url===>', config.url)
+    console.log('data===>', config.data)
     if (store.getters.token) {
       // let each request carry token
       // ['X-Token'] is a custom headers key
@@ -44,7 +45,7 @@ service.interceptors.response.use(
    */
   response => {
     const res = response.data
-
+    console.log('response===>', response.data)
     // if the custom code is not 20000, it is judged as an error.
     if (res.code !== 20000) {
       Message({

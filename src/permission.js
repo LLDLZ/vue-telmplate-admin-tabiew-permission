@@ -5,10 +5,12 @@ import NProgress from 'nprogress' // progress bar
 import 'nprogress/nprogress.css' // progress bar style
 import { getToken } from '@/utils/auth' // get token from cookie
 import getPageTitle from '@/utils/get-page-title'
+import Layout from '@/layout'
+const _import = require('./router/_import_development')
 
 NProgress.configure({ showSpinner: false }) // NProgress Configuration
 
-const whiteList = ['/login'] // no redirect whitelist
+const whiteList = ['/login', '/auth-redirect'] // no redirect whitelist
 
 router.beforeEach(async(to, from, next) => {
   // start progress bar
@@ -24,7 +26,7 @@ router.beforeEach(async(to, from, next) => {
     if (to.path === '/login') {
       // if is logged in, redirect to the home page
       next({ path: '/' })
-      NProgress.done()
+      NProgress.done() // hack: https://github.com/PanJiaChen/vue-element-admin/pull/2939
     } else {
       // determine whether the user has obtained his permission roles through getInfo
       const hasRoles = store.getters.roles && store.getters.roles.length > 0
@@ -34,13 +36,21 @@ router.beforeEach(async(to, from, next) => {
         try {
           // get user info
           // note: roles must be a object array! such as: ['admin'] or ,['developer','editor']
-          const { roles } = await store.dispatch('user/getInfo')
+          await store.dispatch('user/getInfo')
+          // const { roles } = await store.dispatch("user/getInfo");
+          const menus = filtersAsyncRouter(store.getters.menus)
+          console.log(menus)
+          global.antRouter = menus
+          router.addRoutes(menus)
 
           // generate accessible routes map based on roles
-          const accessRoutes = await store.dispatch('permission/generateRoutes', roles)
+          // const accessRoutes = await store.dispatch(
+          //   'permission/generateRoutes',
+          //   roles
+          // )
 
           // dynamically add accessible routes
-          router.addRoutes(accessRoutes)
+          // router.addRoutes(accessRoutes)
 
           // hack method to ensure that addRoutes is complete
           // set the replace: true, so the navigation will not leave a history record
@@ -72,3 +82,21 @@ router.afterEach(() => {
   // finish progress bar
   NProgress.done()
 })
+
+// 过滤服务器传来的数据，转换为组件对象
+const filtersAsyncRouter = asyncRouterMap => {
+  const accessRouters = asyncRouterMap.filter(route => {
+    if (route.component) {
+      if (route.component === 'layout/Layout') {
+        route.component = Layout
+      } else {
+        route.component = _import(route.component)
+      }
+    }
+    if (route.children && route.children.length) {
+      route.children = filtersAsyncRouter(route.children)
+    }
+    return true
+  })
+  return accessRouters
+}
